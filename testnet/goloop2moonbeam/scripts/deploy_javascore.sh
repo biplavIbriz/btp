@@ -12,6 +12,7 @@ deploy_javascore_bmc() {
     --param _net=$(cat net.btp.icon) | jq -r . > tx.bmc.icon
 
     extract_scoreAddress tx.bmc.icon bmc.icon
+    ensure_file_exist $CONFIG_DIR bmc.icon
     echo "btp://$(cat net.btp.icon)/$(cat bmc.icon)" > btp.icon
 }
 
@@ -23,6 +24,7 @@ _deploy_kusamaDecoder(){
     --content_type application/java | jq -r . > tx.kusamaDecoder.icon
 
     extract_scoreAddress tx.kusamaDecoder.icon kusamaDecoder.icon
+    ensure_file_exist $CONFIG_DIR kusamaDecoder.icon
 }
 
 _deploy_moonriverDecoder(){
@@ -33,28 +35,26 @@ _deploy_moonriverDecoder(){
     --content_type application/java | jq -r . > tx.moonriverDecoder.icon
 
     extract_scoreAddress tx.moonriverDecoder.icon moonriverDecoder.icon
+    ensure_file_exist $CONFIG_DIR moonriverDecoder.icon
 }
 
 _prepare_javascore_bmv() {
     _deploy_kusamaDecoder
     _deploy_moonriverDecoder
     
-    export PARA_OFFSET=$(moonbeam_blocknumber)
-    export RELAY_OFFSET=${RELAY_OFFSET:-8511058}
+    export PARA_CHAIN_OFFSET=$(moonbeam_blocknumber)
+    export RELAY_CHAIN_OFFSET=${RELAY_CHAIN_OFFSET:-8511058}
     export RELAY_ENDPOINT=${RELAY_ENDPOINT:-'wss://kusama-rpc.polkadot.io'}
     export PARA_ENDPOINT=${PARA_ENDPOINT:-'ws://moonbeam:9944'}
 
-    echo "getting BMVInitializeParams at PARA_OFFSET:$PARA_OFFSET RELAY_OFFSET:$RELAY_OFFSET"
+    echo "getting BMVInitializeParams at PARA_CHAIN_OFFSET:$PARA_CHAIN_OFFSET RELAY_CHAIN_OFFSET:$RELAY_CHAIN_OFFSET"
     cd $JAVASCORE_HELPER_DIR
-    # sed -i 's/"RELAY_ENDPOINT"/process.env.RELAY_ENDPOINT/' getBMVInitializeParams.ts
-    # sed -i 's/"RELAY_OFFSET"/process.env.RELAY_OFFSET/' getBMVInitializeParams.ts
-    # sed -i 's/"PARA_ENDPOINT"/process.env.PARA_ENDPOINT/' getBMVInitializeParams.ts
-    # sed -i 's/"PARA_OFFSET"/process.env.PARA_OFFSET/' getBMVInitializeParams.ts
-
-    yarn
-    yarn getBMVInitializeParams
+    yarn && yarn getBMVInitializeParams
     wait_file_created $JAVASCORE_HELPER_DIR BMVInitializeData.json
-    echo $PARA_OFFSET > $CONFIG_DIR/offset.moonbeam
+
+    echo $PARA_CHAIN_OFFSET > $CONFIG_DIR/offset.moonbeam_parachain
+    echo $RELAY_CHAIN_OFFSET > $CONFIG_DIR/offset.moonbeam_relaychain
+    
     cp -f BMVInitializeData.json $CONFIG_DIR/
     rm -rf ./node_modules
 }
@@ -94,6 +94,7 @@ deploy_javascore_bmv() {
         | jq -r . > tx.bmv.icon
 
     extract_scoreAddress tx.bmv.icon bmv.icon
+    ensure_file_exist $CONFIG_DIR bmv.icon
 }
 
 deploy_javascore_IRC31Token() {
@@ -104,6 +105,7 @@ deploy_javascore_IRC31Token() {
     --content_type application/java | jq -r . > tx.irc31token.icon
 
     extract_scoreAddress tx.irc31token.icon irc31token.icon
+    ensure_file_exist $CONFIG_DIR irc31token.icon
 }
 
 deploy_javascore_NativeCoinBSH() {
@@ -118,6 +120,7 @@ deploy_javascore_NativeCoinBSH() {
         --param _name=ICX | jq -r . > tx.nativeCoinBsh.icon
 
     extract_scoreAddress tx.nativeCoinBsh.icon nativeCoinBsh.icon
+    ensure_file_exist $CONFIG_DIR nativeCoinBsh.icon
 }
 
 deploy_javascore_FeeAggregation() {
@@ -130,6 +133,7 @@ deploy_javascore_FeeAggregation() {
         --content_type application/java | jq -r . > tx.feeAggregation.icon
 
     extract_scoreAddress tx.feeAggregation.icon feeAggregation.icon
+    ensure_file_exist $CONFIG_DIR feeAggregation.icon
 }
 
 goloop_bmc_addVerifier() {
@@ -191,7 +195,7 @@ goloop_bmc_addRelay() {
     goloop rpc sendtx call --to $(cat bmc.icon) \
         --method addRelay \
         --param _link=$(cat btp.moonbeam) \
-        --param _addr=$(jq -r .address gochain.keystore.json) \
+        --param _addr=$(jq -r .address $GOLOOP_KEY_STORE) \
         | jq -r . > tx.registerRelay.icon
     ensure_txresult tx.registerRelay.icon
 }

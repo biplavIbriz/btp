@@ -32,19 +32,21 @@ JAVASCORE_DIST_DIR=${JAVASCORE_DIST_DIR:-$CONTRACTS_DIST_DIR/javascore}
 SOURCE_CODE_DIR=$JAVASCORE_DIST_DIR/sources
 
 rm -rf $JAVASCORE_DIST_DIR && mkdir -p "$SOURCE_CODE_DIR"
-cp -r javascore/fee_aggregation $SOURCE_CODE_DIR/
-cp -r javascore/*.tar $SOURCE_CODE_DIR/
+cp -r javascore/* $SOURCE_CODE_DIR/
 
-cd $SOURCE_CODE_DIR && tar -xzf iconloop.tar && tar -xzf bmv.tar && mv javascore iconloop
+# Overwrite the current BMV by the BMV without relaychain
+cd $SOURCE_CODE_DIR && \
+    ls -d ./bmv/* | grep -v "./bmv/icon" | xargs rm -rf && \
+    tar -xzf bmv_without_relaychain.tar.gz
 
 ### compiling
 gradle --stop
 cd $SOURCE_CODE_DIR/bmv/eventDecoder && gradle buildKusamaDecoder && gradle buildMoonriverDecoder
 cd $SOURCE_CODE_DIR/bmv/parachain && gradle optimizedJar
 cd $SOURCE_CODE_DIR/fee_aggregation && gradle optimizedJar
-cd $SOURCE_CODE_DIR/iconloop/lib && gradle build
-cd $SOURCE_CODE_DIR/iconloop/bmc && gradle optimizedJar
-cd $SOURCE_CODE_DIR/iconloop/nativecoin && gradle optimizedJar
+cd $SOURCE_CODE_DIR/lib && gradle build
+cd $SOURCE_CODE_DIR/bmc && gradle optimizedJar
+cd $SOURCE_CODE_DIR/nativecoin && gradle optimizedJar && gradle optimizedJarIRC31
 
 ### packing
 cp -rf $SOURCE_CODE_DIR/bmv/helper ${JAVASCORE_DIST_DIR}/
@@ -52,9 +54,9 @@ cp $SOURCE_CODE_DIR/bmv/parachain/build/libs/parachain-BMV-optimized.jar ${JAVAS
 cp $SOURCE_CODE_DIR/bmv/eventDecoder/build/libs/KusamaEventDecoder-optimized.jar ${JAVASCORE_DIST_DIR}/
 cp $SOURCE_CODE_DIR/bmv/eventDecoder/build/libs/MoonriverEventDecoder-optimized.jar ${JAVASCORE_DIST_DIR}/
 cp $SOURCE_CODE_DIR/fee_aggregation/build/libs/fee-aggregation-system-1.0-optimized.jar ${JAVASCORE_DIST_DIR}/
-cp $SOURCE_CODE_DIR/iconloop/bmc/build/libs/bmc-0.1.0-optimized.jar ${JAVASCORE_DIST_DIR}/
-cp $SOURCE_CODE_DIR/iconloop/nativecoin/build/libs/nativecoin-0.1.0-optimized.jar ${JAVASCORE_DIST_DIR}/
-cp $SOURCE_CODE_DIR/iconloop/nativecoin/build/libs/irc31-0.1.0-optimized.jar ${JAVASCORE_DIST_DIR}/
+cp $SOURCE_CODE_DIR/bmc/build/libs/bmc-0.1.0-optimized.jar ${JAVASCORE_DIST_DIR}/
+cp $SOURCE_CODE_DIR/nativecoin/build/libs/nativecoin-0.1.0-optimized.jar ${JAVASCORE_DIST_DIR}/
+cp $SOURCE_CODE_DIR/nativecoin/build/libs/irc31-0.1.0-optimized.jar ${JAVASCORE_DIST_DIR}/
 
 ### cleaning
-rm -rf $SOURCE_CODE_DIR
+# rm -rf $SOURCE_CODE_DIR
