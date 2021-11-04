@@ -375,6 +375,8 @@ class TokenBSH(IconScoreBase):
         balance = self._get_balance(_user, _tokenName)
         usable = balance['usable'] + _usable
         locked = balance['locked'] + _locked
+        Logger.info(f'_update_balance_by() usable={usable}, locked={locked}', TAG)
+
         if usable == 0 and locked == 0:
             self._balance_db[_user].remove(_tokenName)
         else:

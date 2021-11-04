@@ -21,7 +21,13 @@ import foundation.icon.score.util.*;
 import foundation.icon.score.util.ArrayUtil;
 import foundation.icon.score.util.Logger;
 import foundation.icon.score.util.StringUtil;
-import score.*;
+import score.UserRevertedException;
+import score.VarDB;
+import score.ArrayDB;
+import score.BranchDB;
+import score.DictDB;
+import score.Address;
+import score.Context;
 import score.annotation.EventLog;
 import score.annotation.External;
 import score.annotation.Payable;
@@ -399,6 +405,7 @@ public class BTPMessageCenter implements BMC, BMCEvent, ICONSpecific, OwnerManag
                         handleMessage(prev, msg);
                     } else {
                         try {
+                            logger.println("handleRelayMessage", "resolveNext: to = ", msg.getDst().net());
                             Link next = resolveNext(msg.getDst().net());
                             sendMessage(next.getAddr(), msg);
                         } catch (BTPException e) {
@@ -652,6 +659,7 @@ public class BTPMessageCenter implements BMC, BMCEvent, ICONSpecific, OwnerManag
             throw BMCException.invalidSn();
         }
         BTPAddress dst = BTPAddress.parse(_to);
+        logger.println("handleRelayMessage", "resolveNext: to = ", to);
         Link link = resolveNext(_to);
 
         //TODO (txSeq > sackSeq && (currentHeight - sackHeight) > THRESHOLD) ? revert

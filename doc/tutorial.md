@@ -7,42 +7,48 @@ This document describes how to setup a BTP network and interchain token transfer
 
 ### Requirements
 * [Docker](https://docs.docker.com)
+* goloop v0.9.6 or later
 
 ### blockchain
 1. Start the server  
 ````shell
-CONFIG_DIR=/path/to/config
-docker run -d --name goloop -p 9080:9080 \
+$ export CONFIG_DIR=/path/to/config
+$ docker run -d --name goloop -p 9080:9080 \
   -v ${CONFIG_DIR}:/goloop/config \
-  iconloop/goloop
-```` 
+  iconloop/goloop-icon
+````
 for follows, execute under `docker exec -ti --workdir /goloop/config goloop sh`.
+
+install jq
+```shell
+# apk add jq
+```
 
 2. Create genesis  
 
 ````shell
-goloop gn gen --out src.genesis.json $GOLOOP_KEY_STORE  
-goloop gn gen --out dst.genesis.json $GOLOOP_KEY_STORE
+# goloop gn gen --out src.genesis.json $GOLOOP_KEY_STORE
+# goloop gn gen --out dst.genesis.json $GOLOOP_KEY_STORE
 ````
 
 modify genesis for javaee
 ````shell
-echo $(cat src.genesis.json | jq -r '.*{"chain":{"fee":{"stepLimit":{"invoke":"0x10000000","query":"0x1000000"}}}}') > src.genesis.json
-echo $(cat dst.genesis.json | jq -r '.*{"chain":{"fee":{"stepLimit":{"invoke":"0x10000000","query":"0x1000000"}}}}') > dst.genesis.json
+# echo $(cat src.genesis.json | jq -r '.*{"chain":{"fee":{"stepLimit":{"invoke":"0x10000000","query":"0x1000000"}}}}') > src.genesis.json
+# echo $(cat dst.genesis.json | jq -r '.*{"chain":{"fee":{"stepLimit":{"invoke":"0x10000000","query":"0x1000000"}}}}') > dst.genesis.json
 ````
 
 3. Join the chain
 
 ````shell
-goloop chain join --genesis_template src.genesis.json --channel src
-goloop chain join --genesis_template dst.genesis.json --channel dst
+# goloop chain join --genesis_template src.genesis.json --channel src
+# goloop chain join --genesis_template dst.genesis.json --channel dst
 ````
 
 4. Start the chain   
 
 ````shell
-goloop chain start src
-goloop chain start dst
+# goloop chain start src
+# goloop chain start dst
 ````
 
 ## Deploy Smart Contracts
@@ -50,16 +56,16 @@ goloop chain start dst
 zip each BTP-Smart-Contracts from project source, and copy files to `/path/to/config` which is mounted with `/goloop/config` of goloop container
 
 ````shell
-make dist-py
-mkdir -p ${CONFIG_DIR}/pyscore
-cp build/contracts/pyscore/*.zip ${CONFIG_DIR}/pyscore/
+$ make dist-py
+$ mkdir -p ${CONFIG_DIR}/pyscore
+$ cp build/contracts/pyscore/*.zip ${CONFIG_DIR}/pyscore/
 ````
 
 package for javascore/bmc
 ````shell
-make dist-java
-mkdir -p ${CONFIG_DIR}/javascore
-cp build/contracts/javascore/*.jar ${CONFIG_DIR}/javascore/
+$ make dist-java
+$ mkdir -p ${CONFIG_DIR}/javascore
+$ cp build/contracts/javascore/*.jar ${CONFIG_DIR}/javascore/
 ````
 
 ### Environment for JSON-RPC
@@ -98,6 +104,8 @@ rpcks() {
   fi
   echo $GOLOOP_RPC_KEY_STORE
 }
+
+export GOLOOP_CHAINSCORE=cx0000000000000000000000000000000000000000
 ```` 
 
 ### BMC
@@ -314,15 +322,15 @@ goloop rpc sendtx call --to $(cat bmc.$(rpcch)) \
 Register IRC 2.0 Token contract to Token-BSH
 ````shell
 rpcch src
-goloop rpc sendtx call --to $(cat token.src) \
+goloop rpc sendtx call --to $(cat token.$(rpcch)) \
   --method register \
   --param _name=IRC2Token \
-  --param _addr=$(cat irc2.src)
+  --param _addr=$(cat irc2.$(rpcch))
 rpcch dst
-goloop rpc sendtx call --to $(cat token.dst) \
+goloop rpc sendtx call --to $(cat token.$(rpcch)) \
   --method register \
   --param _name=IRC2Token \
-  --param _addr=$(cat irc2.dst)
+  --param _addr=$(cat irc2.$(rpcch))
 ````
 
 > To retrieve list of registered token, use `tokenNames` method of Token-BSH.  
@@ -342,7 +350,7 @@ Register BMC-Owner to 'src' chain
 rpcch src
 goloop rpc sendtx call --to $(cat bmc.$(rpcch)) \
     --method addOwner \
-    --param _addr=$(jq -r .address src.ks.json)
+    --param _addr=$(jq -r .address $(rpcch).ks.json)
 ````
 
 BMC-Owner register BMR to 'src' chain (Address of BMR could be any keystore)
@@ -356,10 +364,11 @@ goloop rpc sendtx call --to $(cat bmc.$(rpcch)) \
 
 For 'dst' chain, same flows with replace 'src' to 'dst'
 ````shell
+rpcks $GOLOOP_KEY_STORE $GOLOOP_KEY_SECRET
 rpcch dst
 goloop rpc sendtx call --to $(cat bmc.$(rpcch)) \
     --method addOwner \
-    --param _addr=$(jq -r .address dst.ks.json)
+    --param _addr=$(jq -r .address $(rpcch).ks.json)
 rpcks dst.ks.json dst.secret
 goloop rpc sendtx call --to $(cat bmc.$(rpcch)) \
     --method addRelay \
@@ -385,6 +394,7 @@ To register relayer candidate, bonding is required.
 The account of 'god' transfer some icx to account of relayer candidate.
 Assume 'src' chain as ICON
 ````shell
+rpcks $GOLOOP_KEY_STORE $GOLOOP_KEY_SECRET
 rpcch src
 goloop rpc sendtx transfer --to $(jq -r .address relayer.ks.json) --value 0x10
 ````
@@ -437,18 +447,24 @@ docker run -d --name btpsimple_dst --link goloop \
 ````
 
 > To retrieve status of relay, use `getStatus(_link)` method of BMC.  
-> `goloop rpc call --to $(cat bmc.src) --method getStatus --param _link=$(cat btp.dst)`
-> `goloop rpc call --to $(cat bmc.dst) --method getStatus --param _link=$(cat btp.src)`
+> ```shell
+> # rpcch src
+> # goloop rpc call --to $(cat bmc.src) --method getStatus --param _link=$(cat btp.dst)
+> ```
+> ```shell
+> # rpcch dst
+> # goloop rpc call --to $(cat bmc.dst) --method getStatus --param _link=$(cat btp.src)
+> ```
 
 ## Interchain Token Transfer
 > To use `goloop` as json-rpc client, execute shell via `docker exec -ti --workdir /goloop/config goloop sh` on goloop container.
 
 Create key store for Alice and Bob
 ````shell
-echo -n \$(date|md5sum|head -c16) > alice.secret
-goloop ks gen -o alice.ks.json  -p \$(cat alice.secret)
-echo -n \$(date|md5sum|head -c16) > bob.secret
-goloop ks gen -o bob.ks.json  -p \$(cat bob.secret)
+echo -n $(date|md5sum|head -c16) > alice.secret
+goloop ks gen -o alice.ks.json  -p $(cat alice.secret)
+echo -n $(date|md5sum|head -c16) > bob.secret
+goloop ks gen -o bob.ks.json  -p $(cat bob.secret)
 ````
 
 Mint token to Alice
